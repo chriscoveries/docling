@@ -419,6 +419,7 @@ class ApiImageStreamingRequestResult:
     num_tokens: int | None
     usage: Any | None = None
     logprobs: Any | None = None
+    stop_reason: VlmStopReason = VlmStopReason.UNSPECIFIED
 
 
 class ContainerElement(

@@ -162,6 +162,7 @@ class ApiVlmModel(BaseVlmPageModel):
                 )
                 page_tags = api_response.text
                 num_tokens = api_response.num_tokens
+                stop_reason = api_response.stop_reason
             else:
                 # Non-streaming fallback (existing behavior)
                 api_response = api_image_request(

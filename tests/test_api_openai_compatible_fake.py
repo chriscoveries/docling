@@ -28,6 +28,7 @@ from docling.models.inference_engines.vlm.api_openai_compatible_engine import (
     ApiVlmEngine,
 )
 from docling.models.inference_engines.vlm.base import VlmEngineInput
+from docling.models.utils.generation_utils import GenerationStopper
 from docling.utils.api_image_request import (
     api_image_request,
     api_image_request_streaming,
@@ -259,3 +260,65 @@ def test_engine_batches_every_input(api, image):
 
     assert len(outputs) == 2
     assert len(api.service.requests_for("POST", r"/v1/chat/completions")) == 2
+
+
+class _NeverStop(GenerationStopper):
+    def should_stop(self, text: str) -> bool:
+        return False
+
+
+@pytest.mark.parametrize(
+    ("finish_reason", "expected_reason"),
+    [
+        ("length", VlmStopReason.LENGTH),
+        ("content_filter", VlmStopReason.CONTENT_FILTERED),
+        ("stop", VlmStopReason.END_OF_SEQUENCE),
+    ],
+)
+@pytest.mark.parametrize("report_usage", [False, True])
+def test_streaming_engine_preserves_provider_finish_reason(
+    api, image, finish_reason, expected_reason, report_usage
+):
+    api.finish_reason = finish_reason
+    api.report_usage = report_usage
+    api.stream_chunks = ["partial"]
+
+    (output,) = _engine(api).predict_batch(
+        [
+            VlmEngineInput(
+                image=image,
+                prompt="describe",
+                extra_generation_config={"custom_stopping_criteria": [_NeverStop()]},
+            )
+        ]
+    )
+
+    assert output.text == "partial"
+    assert output.stop_reason == expected_reason
+
+
+def test_streaming_engine_preserves_a_stateful_stoppers_decision(api, image):
+    calls = []
+
+    class _StopOnce(GenerationStopper):
+        def lookback_tokens(self) -> int:
+            return 2
+
+        def should_stop(self, text: str) -> bool:
+            calls.append(text)
+            return len(calls) == 1
+
+    api.stream_chunks = ["ABC", "remaining"]
+    (output,) = _engine(api).predict_batch(
+        [
+            VlmEngineInput(
+                image=image,
+                prompt="describe",
+                extra_generation_config={"custom_stopping_criteria": [_StopOnce()]},
+            )
+        ]
+    )
+
+    assert output.text == "ABC"
+    assert output.stop_reason == VlmStopReason.STOP_SEQUENCE
+    assert calls == ["BC"]

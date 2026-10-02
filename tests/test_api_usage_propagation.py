@@ -52,8 +52,10 @@ class _StopOnDone(GenerationStopper):
         (
             True,
             "api_image_request_streaming",
-            ApiImageStreamingRequestResult("done", 8, {"total_tokens": 8}),
-            VlmStopReason.UNSPECIFIED,
+            ApiImageStreamingRequestResult(
+                "done", 8, {"total_tokens": 8}, stop_reason=VlmStopReason.STOP_SEQUENCE
+            ),
+            VlmStopReason.STOP_SEQUENCE,
         ),
     ],
 )
@@ -98,8 +100,13 @@ def test_api_vlm_model_preserves_usage_on_prediction(
                 extra_generation_config={"custom_stopping_criteria": [_StopOnDone()]},
             ),
             "api_image_request_streaming",
-            ApiImageStreamingRequestResult("done", 10, {"total_tokens": 10}),
-            "custom_criteria",
+            ApiImageStreamingRequestResult(
+                "done",
+                10,
+                {"total_tokens": 10},
+                stop_reason=VlmStopReason.STOP_SEQUENCE,
+            ),
+            VlmStopReason.STOP_SEQUENCE,
         ),
     ],
 )

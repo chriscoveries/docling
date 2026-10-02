@@ -352,6 +352,7 @@ def api_image_request_streaming(
             full_text = []
             usage_payload = None
             num_tokens = None
+            stop_reason = VlmStopReason.UNSPECIFIED
             usage_key = _resolve_usage_response_key(
                 usage_response_key=usage_response_key,
                 token_extract_key=token_extract_key,
@@ -377,8 +378,11 @@ def api_image_request_streaming(
                 # obj["choices"][0]["delta"]["content"] may be None or missing
                 # (e.g., tool calls)
                 try:
-                    delta = obj["choices"][0].get("delta") or {}
+                    choice = obj["choices"][0]
+                    delta = choice.get("delta") or {}
                     piece = delta.get("content") or ""
+                    if choice.get("finish_reason") is not None:
+                        stop_reason = _map_stop_reason(choice["finish_reason"])
                 except (KeyError, IndexError) as e:
                     _log.debug("Unexpected SSE chunk shape: %s", e)
                     piece = ""
@@ -404,10 +408,12 @@ def api_image_request_streaming(
                                 text="".join(full_text),
                                 num_tokens=num_tokens,
                                 usage=usage_payload,
+                                stop_reason=VlmStopReason.STOP_SEQUENCE,
                             )
 
             return ApiImageStreamingRequestResult(
                 text="".join(full_text),
                 num_tokens=num_tokens,
                 usage=usage_payload,
+                stop_reason=stop_reason,
             )

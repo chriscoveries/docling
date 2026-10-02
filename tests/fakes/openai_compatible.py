@@ -40,6 +40,7 @@ class FakeOpenAiApi:
     """State plus an ``APIRouter`` serving ``/v1/chat/completions``."""
 
     completion: str = DEFAULT_COMPLETION
+    finish_reason: str = "stop"
     #: Emitted one SSE chunk at a time when the caller asks for a stream.
     stream_chunks: list[str] = field(default_factory=list)
     prompt_tokens: int = 11
@@ -81,7 +82,7 @@ class FakeOpenAiApi:
                     message=OpenAiChatMessage(
                         role="assistant", content=self.completion
                     ),
-                    finish_reason="stop",
+                    finish_reason=self.finish_reason,
                 )
             ],
             usage=self._usage(),
@@ -104,15 +105,15 @@ class FakeOpenAiApi:
             }
             yield f"data: {json.dumps(event)}\n\n".encode()
         usage = self._usage()
+        final = {
+            "id": "chatcmpl-fake-1",
+            "model": model,
+            "created": 1_700_000_000,
+            "choices": [{"index": 0, "delta": {}, "finish_reason": self.finish_reason}],
+        }
         if usage is not None:
-            final = {
-                "id": "chatcmpl-fake-1",
-                "model": model,
-                "created": 1_700_000_000,
-                "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
-                "usage": json.loads(usage.model_dump_json()),
-            }
-            yield f"data: {json.dumps(final)}\n\n".encode()
+            final["usage"] = json.loads(usage.model_dump_json())
+        yield f"data: {json.dumps(final)}\n\n".encode()
         yield b"data: [DONE]\n\n"
 
     # -- routes ----------------------------------------------------------
