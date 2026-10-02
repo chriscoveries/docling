@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any, Callable, List, Union
 
 from PIL.Image import Image
 
+from docling.datamodel.base_models import VlmStopReason
 from docling.datamodel.vlm_engine_options import MlxVlmEngineOptions
 from docling.models.inference_engines.vlm._utils import (
     check_min_engine_version,
@@ -266,7 +267,7 @@ class MlxVlmEngine(BaseVlmEngine, HuggingFaceModelDownloadMixin):
 
                 output_text = ""
                 num_tokens = 0
-                stop_reason = "unspecified"
+                stop_reason = VlmStopReason.UNSPECIFIED
 
                 # Use stream_generate for proper stop string handling
                 for token in self.stream_generate(
@@ -279,7 +280,13 @@ class MlxVlmEngine(BaseVlmEngine, HuggingFaceModelDownloadMixin):
                     temp=input_data.temperature,
                 ):
                     output_text += token.text
-                    num_tokens += 1
+                    # MLX reports a cumulative count, including on the final
+                    # detokenizer flush; counting chunks overcounts that flush.
+                    num_tokens = token.generation_tokens
+                    if token.finish_reason == "length":
+                        stop_reason = VlmStopReason.LENGTH
+                    elif token.finish_reason == "stop":
+                        stop_reason = VlmStopReason.END_OF_SEQUENCE
 
                     # Check for configured stop strings
                     if input_data.stop_strings:
@@ -288,7 +295,7 @@ class MlxVlmEngine(BaseVlmEngine, HuggingFaceModelDownloadMixin):
                             for stop_str in input_data.stop_strings
                         ):
                             _log.debug("Stopping generation due to stop string match")
-                            stop_reason = "stop_string"
+                            stop_reason = VlmStopReason.STOP_SEQUENCE
                             break
 
                     # Check for custom stopping criteria
@@ -307,7 +314,7 @@ class MlxVlmEngine(BaseVlmEngine, HuggingFaceModelDownloadMixin):
                                     _log.info(
                                         f"Stopping generation due to GenerationStopper: {type(stopper).__name__}"
                                     )
-                                    stop_reason = "custom_criteria"
+                                    stop_reason = VlmStopReason.STOP_SEQUENCE
                                     break
                             except Exception as e:
                                 _log.warning(
