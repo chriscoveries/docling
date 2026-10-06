@@ -118,13 +118,15 @@ class ReadingOrderModel:
                 doc.add_heading(parent=doc_item, text=c_text, prov=c_prov)
             else:
                 content_layer = ContentLayer.BODY
+                child_parent = doc_item
                 if c_label in (
                     DocItemLabel.PAGE_HEADER,
                     DocItemLabel.PAGE_FOOTER,
                 ):
                     content_layer = ContentLayer.FURNITURE
+                    child_parent = doc.furniture
                 doc.add_text(
-                    parent=doc_item,
+                    parent=child_parent,
                     label=c_label,
                     text=c_text,
                     prov=c_prov,
@@ -646,6 +648,7 @@ class ReadingOrderModel:
             content_layer = ContentLayer.BODY
             if element.label in [DocItemLabel.PAGE_HEADER, DocItemLabel.PAGE_FOOTER]:
                 content_layer = ContentLayer.FURNITURE
+                parent = out_doc.furniture
 
             new_item = out_doc.add_text(
                 label=element.label,

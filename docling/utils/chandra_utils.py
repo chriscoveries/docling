@@ -405,11 +405,13 @@ class _ChandraDocumentBuilder:
         ]
         if not merged:
             return
-        layer = (
-            ContentLayer.FURNITURE
-            if label in {DocItemLabel.PAGE_HEADER, DocItemLabel.PAGE_FOOTER}
-            else ContentLayer.BODY
-        )
+        is_furniture = label in {
+            DocItemLabel.PAGE_HEADER,
+            DocItemLabel.PAGE_FOOTER,
+        }
+        layer = ContentLayer.FURNITURE if is_furniture else ContentLayer.BODY
+        if is_furniture:
+            parent = self.doc.furniture
         if len(merged) > 1 and label == DocItemLabel.FORMULA:
             if all(
                 run.label == DocItemLabel.FORMULA

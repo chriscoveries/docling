@@ -62,6 +62,36 @@ def test_chandra_simple_parsing():
             assert prov.bbox.l >= 0 and prov.bbox.t >= 0
 
 
+def test_chandra_furniture_items_use_furniture_root() -> None:
+    content = (
+        '<div data-bbox="0 0 1000 100" data-label="Page-Header">Header</div>'
+        '<div data-bbox="0 100 1000 900" data-label="Text">Body</div>'
+        '<div data-bbox="0 900 1000 1000" data-label="Page-Footer">Footer</div>'
+    )
+
+    doc = parse_chandra_html(
+        content=content,
+        original_page_size=Size(width=1000, height=1000),
+        page_no=1,
+        filename="furniture.html",
+    )
+
+    header, body, footer = doc.texts
+    assert [item.text for item in (header, body, footer)] == [
+        "Header",
+        "Body",
+        "Footer",
+    ]
+    assert header.parent == doc.furniture.get_ref()
+    assert footer.parent == doc.furniture.get_ref()
+    assert body.parent == doc.body.get_ref()
+    assert [ref.resolve(doc) for ref in doc.furniture.children] == [header, footer]
+    assert [ref.resolve(doc) for ref in doc.body.children] == [body]
+    assert header.content_layer == footer.content_layer == ContentLayer.FURNITURE
+    assert body.content_layer == ContentLayer.BODY
+    assert doc.export_to_markdown() == "Body"
+
+
 def test_chandra_br_spacing():
     """Test that br tags preserve spacing between text."""
     content = '<div data-bbox="0 0 1000 1000" data-label="Text">Hello<br/>World</div>'

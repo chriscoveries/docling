@@ -62,6 +62,38 @@ def _conversion_result(elements: list[PageElement]) -> ConversionResult:
     )
 
 
+def test_reading_order_furniture_items_use_furniture_root() -> None:
+    header_cluster = _cluster(1, DocItemLabel.PAGE_HEADER, (10, 10, 490, 30))
+    body_cluster = _cluster(2, DocItemLabel.TEXT, (10, 100, 490, 120))
+    footer_cluster = _cluster(3, DocItemLabel.PAGE_FOOTER, (10, 470, 490, 490))
+    elements = [
+        TextElement(
+            label=cluster.label,
+            id=cluster.id,
+            text=text,
+            page_no=1,
+            cluster=cluster,
+        )
+        for cluster, text in [
+            (header_cluster, "Header"),
+            (body_cluster, "Body"),
+            (footer_cluster, "Footer"),
+        ]
+    ]
+
+    doc = ReadingOrderModel(ReadingOrderOptions())(_conversion_result(elements))
+
+    header, body, footer = doc.texts
+    assert header.parent == doc.furniture.get_ref()
+    assert footer.parent == doc.furniture.get_ref()
+    assert body.parent == doc.body.get_ref()
+    assert [ref.resolve(doc) for ref in doc.furniture.children] == [header, footer]
+    assert [ref.resolve(doc) for ref in doc.body.children] == [body]
+    assert header.content_layer == footer.content_layer == ContentLayer.FURNITURE
+    assert body.content_layer == ContentLayer.BODY
+    assert doc.export_to_markdown() == "Body"
+
+
 def test_container_orders_mixed_children_uniformly() -> None:
     table_cluster = _cluster(2, DocItemLabel.TABLE, (10, 10, 150, 100))
     picture_cluster = _cluster(3, DocItemLabel.PICTURE, (200, 200, 300, 300))
